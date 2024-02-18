@@ -39,24 +39,15 @@ class FourDGSdataset(Dataset):
         caminfo = self.dataset[index]
         image = caminfo.image
         image = PILtoTorch(image,None)
-
-        cameradirect = caminfo.hpdirecitons
-        camerapose = caminfo.pose 
-        
         loaded_mask = None
         
-        if camerapose is not None:
-            rays_o, rays_d = 1, cameradirect # TODO always True
-        else :
-            rays_o = None
-            rays_d = None
         return Camera(colmap_id=caminfo.uid, R=caminfo.R, T=caminfo.T, 
                 FoVx=caminfo.FovX, FoVy=caminfo.FovY, 
                 image=image, gt_alpha_mask=loaded_mask,
                 image_name=caminfo.image_name, uid=id, data_device=torch.device("cuda"), #있던거
-                near=caminfo.near, far=caminfo.far, 
                 timestamp=caminfo.timestamp, 
-                rayo=rays_o, rayd=rays_d,cxr=caminfo.cxr,cyr=caminfo.cyr)
+                world_view_transform=caminfo.world_view_transform,full_proj_transform=caminfo.full_proj_transform,
+                camera_center=caminfo.camera_center,rays=caminfo.rays)
     def __len__(self):
         
         return len(self.dataset)
@@ -107,7 +98,11 @@ class COLMAP_Dataset(Dataset):#follow scene.neural_3D-dataset_NDC.Neural3D_NDC_D
                 FovX = focal2fov(focal_length_x, width)
             else:
                 assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
-            self.camera_params.append([uid,Rotation,Translation,FovY,FovX,width,height])
+            world_view_transform,full_proj_transform,camera_center,rays \
+                = self.get_rays(Rotation,Translation,FovY,FovX,width,height)
+            
+            self.camera_params.append([uid,Rotation,Translation,FovY,FovX,width,height,\
+                                       world_view_transform,full_proj_transform,camera_center,rays])
 
             for j in range(startime, startime+ int(duration)):
                 image_path = os.path.join(images_folder, os.path.basename(extr.name))
@@ -131,26 +126,30 @@ class COLMAP_Dataset(Dataset):#follow scene.neural_3D-dataset_NDC.Neural3D_NDC_D
         cam_num = int(image_name[3:])
 
         image = Image.open(self.images_paths[index])
-        uid,Rotation,Translation,FovY,FovX,width,height = self.camera_params[cam_num]
+        uid,Rotation,Translation,FovY,FovX,width,height,\
+            world_view_transform,full_proj_transform,camera_center,rays \
+                = self.camera_params[cam_num]
 
         if True:#frame_num == self.start_time:
             cam_info = CameraInfo(uid=uid, R=Rotation, T=Translation, FovY=FovY, FovX=FovX, image=image, image_path=image_path, 
                                   image_name=image_name, width=width, height=height, near=self.near, far=self.far, 
-                                  timestamp=(frame_num-self.start_time)/self.duration, pose=1, hpdirecitons=1,cxr=0.0, cyr=0.0)
+                                  timestamp=(frame_num-self.start_time)/self.duration, pose=1, hpdirecitons=1,cxr=0.0, cyr=0.0,
+                                  world_view_transform=world_view_transform,full_proj_transform=full_proj_transform,
+                                  camera_center=camera_center,rays=rays)
         else: # TODO pose and hpdirections
             cam_info = CameraInfo(uid=uid, R=Rotation, T=Translation, FovY=FovY, FovX=FovX, image=image, image_path=image_path, 
                                   image_name=image_name, width=width, height=height, near=self.near, far=self.far, 
                                   timestamp=(frame_num-self.start_time)/self.duration, pose=None, hpdirecitons=None, cxr=0.0, cyr=0.0)
         return cam_info
-    def get_rays(Rotation,Translation,FoVy,FoVx,width,height):
-        world_view_transform = torch.tensor(getWorld2View2(Rotation, Translation, np.array([0.0, 0.0, 0.0]), 1.0)).transpose(0, 1)
-        projection_matrix = getProjectionMatrix(znear=0.01, zfar=100.0, fovX=FoVx, fovY=FoVy).transpose(0,1)
+    def get_rays(self,Rotation,Translation,FovY,FovX,width,height):
+        world_view_transform = torch.tensor(getWorld2View2(Rotation, Translation, np.array([0.0, 0.0, 0.0]), 1.0)).transpose(0, 1)#.cuda()
+        projection_matrix = getProjectionMatrix(znear=0.01, zfar=100.0, fovX=FovX, fovY=FovY).transpose(0,1)#.cuda()
         full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
         camera_center = world_view_transform.inverse()[3, :3]
         projectinverse = projection_matrix.T.inverse()
         camera2wold = world_view_transform.T.inverse()
         pixgrid = create_meshgrid(height, width, normalized_coordinates=False, device="cpu")[0]
-        #pixgrid = pixgrid#.cuda()  # H,W,
+        pixgrid = pixgrid#.cuda()  # H,W,
         
         xindx = pixgrid[:,:,0] # x 
         yindx = pixgrid[:,:,1] # y
@@ -169,10 +168,10 @@ class COLMAP_Dataset(Dataset):#follow scene.neural_3D-dataset_NDC.Neural3D_NDC_D
         direction = diretioninlocal[:,:,:3] @ camera2wold[:3,:3].T 
         rays_d = torch.nn.functional.normalize(direction, p=2.0, dim=-1)
 
-        
         rayo = camera_center.expand(rays_d.shape).permute(2, 0, 1).unsqueeze(0)                                     #rayo.permute(2, 0, 1).unsqueeze(0)
         rayd = rays_d.permute(2, 0, 1).unsqueeze(0)
         rays = torch.cat([rayo, rayd], dim=1)
+        #print(world_view_transform.shape,full_proj_transform.shape,camera_center.shape,rays.shape)
         return world_view_transform,full_proj_transform,camera_center,rays
 class CameraInfo(NamedTuple):
     uid: int
@@ -192,3 +191,7 @@ class CameraInfo(NamedTuple):
     hpdirecitons: np.array
     cxr: float
     cyr: float
+    world_view_transform:torch.tensor
+    full_proj_transform:torch.tensor
+    camera_center:torch.tensor
+    rays:torch.tensor

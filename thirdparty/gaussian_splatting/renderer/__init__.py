@@ -59,10 +59,10 @@ def train_ours_full(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch
         tanfovy=tanfovy,
         bg=bg_color,
         scale_modifier=scaling_modifier,
-        viewmatrix=viewpoint_camera.world_view_transform,
-        projmatrix=viewpoint_camera.full_proj_transform,
+        viewmatrix=viewpoint_camera.world_view_transform.cuda(),
+        projmatrix=viewpoint_camera.full_proj_transform.cuda(),
         sh_degree=pc.active_sh_degree,
-        campos=viewpoint_camera.camera_center,
+        campos=viewpoint_camera.camera_center.cuda(),
         prefiltered=False)
 
     rasterizer = GRzer(raster_settings=raster_settings)
@@ -100,7 +100,7 @@ def train_ours_full(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch
         rotations = rotations,
         cov3D_precomp = cov3D_precomp)
 
-    rendered_image = pc.rgbdecoder(rendered_image.unsqueeze(0), viewpoint_camera.rays, viewpoint_camera.timestamp) # 1 , 3
+    rendered_image = pc.rgbdecoder(rendered_image.unsqueeze(0), viewpoint_camera.rays.cuda(), viewpoint_camera.timestamp) # 1 , 3
     rendered_image = rendered_image.squeeze(0)
     return {"render": rendered_image,
             "viewspace_points": screenspace_points,
@@ -141,8 +141,8 @@ def test_ours_full(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.
         tanfovy=tanfovy,
         bg=bg_color,
         scale_modifier=scaling_modifier,
-        viewmatrix=viewpoint_camera.world_view_transform,
-        projmatrix=viewpoint_camera.full_proj_transform,
+        viewmatrix=viewpoint_camera.world_view_transform.cuda(),
+        projmatrix=viewpoint_camera.full_proj_transform.cuda(),
         sh_degree=pc.active_sh_degree,
         campos=viewpoint_camera.camera_center,
         prefiltered=False)
@@ -182,7 +182,7 @@ def test_ours_full(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.
         rotations = rotations,
         cov3D_precomp = cov3D_precomp)
 
-    rendered_image = pc.rgbdecoder(rendered_image.unsqueeze(0), viewpoint_camera.rays, viewpoint_camera.timestamp) # 1 , 3
+    rendered_image = pc.rgbdecoder(rendered_image.unsqueeze(0), viewpoint_camera.rays.cuda(), viewpoint_camera.timestamp) # 1 , 3
     rendered_image = rendered_image.squeeze(0)
     torch.cuda.synchronize()
     duration = time.time() - startime 

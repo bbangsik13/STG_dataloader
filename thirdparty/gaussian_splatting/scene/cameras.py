@@ -23,9 +23,8 @@ from utils.general_utils import PILtoTorch
 
 class Camera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,
-                 image_name, uid,
-                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device = "cuda", 
-                 near=0.01, far=100.0, timestamp=0.0, rayo=None, rayd=None, rays=None, cxr=0.0,cyr=0.0,
+                 image_name, uid, data_device = "cuda", timestamp=0.0,
+                 world_view_transform=None,full_proj_transform=None,camera_center=None,rays=None
                  ):
         super(Camera, self).__init__()
 
@@ -60,63 +59,18 @@ class Camera(nn.Module):
             self.image_width = image[0]
             self.image_height = image[1]
             self.original_image = None
+        self.world_view_transform = world_view_transform
+        self.full_proj_transform = full_proj_transform
+        self.camera_center = camera_center
+        self.rays = rays
 
-        self.zfar = 100.0
-        self.znear = 0.01  
-
-        self.trans = trans
-        self.scale = scale
-
-        self.world_view_transform = torch.tensor(getWorld2View2(R, T, trans, scale)).transpose(0, 1)#.cuda()
-        if cyr != 0.0 :#False
-            self.cxr = cxr
-            self.cyr = cyr
-            self.projection_matrix = getProjectionMatrixCV(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy, cx=cxr, cy=cyr).transpose(0,1)#.cuda()
-        else:#True
-            self.projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy).transpose(0,1)#.cuda()
-        self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)
-        self.camera_center = self.world_view_transform.inverse()[3, :3]
-        
-        if rayd is not None:#always true
-            projectinverse = self.projection_matrix.T.inverse()
-            camera2wold = self.world_view_transform.T.inverse()
-            pixgrid = create_meshgrid(self.image_height, self.image_width, normalized_coordinates=False, device="cpu")[0]
-            #pixgrid = pixgrid#.cuda()  # H,W,
-            
-            xindx = pixgrid[:,:,0] # x 
-            yindx = pixgrid[:,:,1] # y
-      
-            
-            ndcy, ndcx = pix2ndc(yindx, self.image_height), pix2ndc(xindx, self.image_width)
-            ndcx = ndcx.unsqueeze(-1)
-            ndcy = ndcy.unsqueeze(-1)# * (-1.0)
-            
-            ndccamera = torch.cat((ndcx, ndcy,   torch.ones_like(ndcy) * (1.0) , torch.ones_like(ndcy)), 2) # N,4 
-
-            projected = ndccamera @ projectinverse.T 
-            diretioninlocal = projected / projected[:,:,3:] #v 
-
-
-            direction = diretioninlocal[:,:,:3] @ camera2wold[:3,:3].T 
-            rays_d = torch.nn.functional.normalize(direction, p=2.0, dim=-1)
-
-            
-            self.rayo = self.camera_center.expand(rays_d.shape).permute(2, 0, 1).unsqueeze(0)                                     #rayo.permute(2, 0, 1).unsqueeze(0)
-            self.rayd = rays_d.permute(2, 0, 1).unsqueeze(0)
-            self.rays = torch.cat([self.rayo, self.rayd], dim=1)#.cuda()
-            del rays_d,direction,diretioninlocal,projected,ndccamera,ndcy,ndcx,yindx,xindx,pixgrid,camera2wold,projectinverse
-        else :
-            self.rayo = None
-            self.rayd = None
-            self.rays = None
-        del image,scale,trans,R,T
-    def to_device(self):
+    '''def to_device(self):
         self.original_image = self.original_image.to(self.data_device)
         self.world_view_transform = self.world_view_transform.to(self.data_device)
         self.full_proj_transform = self.full_proj_transform.to(self.data_device)
         self.camera_center = self.camera_center.to(self.data_device)
         if self.rays is not None:
-            self.rays = self.rays.to(self.data_device)
+            self.rays = self.rays.to(self.data_device)'''
 
 
 

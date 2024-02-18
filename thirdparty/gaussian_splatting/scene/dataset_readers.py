@@ -785,9 +785,6 @@ def readColmapSceneInfo(path, images, eval, llffhold=8, multiview=False, duratio
     
     # TODO: anchor
     #cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir), near=near, far=far, startime=starttime, duration=duration)
-    
-     
-
     if True:
         train_cam_infos = COLMAP_Dataset(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir), near=near, far=far, startime=starttime, duration=duration,split="train")
         test_cam_infos = COLMAP_Dataset(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir), near=near, far=far, startime=starttime, duration=duration,split="test")

@@ -120,7 +120,6 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
     for idx in tqdm(range(len(views)), desc="Rendering and metric progress"):
         view = views[idx]
-        view.to_device()
         renderingpkg = render(view, gaussians, pipeline, background, scaling_modifier=1.0, basicfunction=rbfbasefunction,  GRsetting=GRsetting, GRzer=GRzer) # C x H x W
         rendering = renderingpkg["render"]
         rendering = torch.clamp(rendering, 0, 1.0)
@@ -158,7 +157,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
             if idx > 10: #warm up
                 times.append(duration)
 
-    print(np.mean(np.array(times)))
+    print(f'fps:{1/np.mean(np.array(times)):.04}')
     if len(views) > 0:
         full_dict[model_path][iteration].update({"SSIM": torch.tensor(ssims).mean().item(),
                                         "PSNR": torch.tensor(psnrs).mean().item(),

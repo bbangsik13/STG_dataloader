@@ -89,7 +89,6 @@ def train(dataset, opt, pipe, saving_iterations, debug_from, densify=0, duration
     ema_loss_for_log = 0.0
     #if freeze != 1:
     first_iter = 0
-    progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
 
     flag = 0
@@ -118,7 +117,7 @@ def train(dataset, opt, pipe, saving_iterations, debug_from, densify=0, duration
     with torch.no_grad():
         for idx in range(0,len(viewpoint_stack),duration):
             viewpoint_cam = viewpoint_stack[idx]
-            viewpoint_cam.to_device()
+            #viewpoint_cam.to_device()
             render_pkg = render(viewpoint_cam, gaussians, pipe, background,  override_color=None,  basicfunction=rbfbasefunction, GRsetting=GRsetting, GRzer=GRzer)
             
             _, depthH, depthW = render_pkg["depth"].shape
@@ -148,6 +147,7 @@ def train(dataset, opt, pipe, saving_iterations, debug_from, densify=0, duration
     viewpoint_stack = scene.getTrainCameras()
     viewpoint_stack_loader = DataLoader(viewpoint_stack, batch_size=batch_size,shuffle=True,num_workers=32,collate_fn=list)
     loader = iter(viewpoint_stack_loader)
+    progress_bar = tqdm(range(first_iter, opt.iterations+1), desc="Training progress")
     for iteration in range(first_iter, opt.iterations + 1):        
         if iteration ==  opt.emsstart:
             flagems = 1 # start ems
@@ -164,7 +164,7 @@ def train(dataset, opt, pipe, saving_iterations, debug_from, densify=0, duration
             gaussians.zero_gradient_cache()            
             try:
                 viewpoint_cam = next(loader)[0]
-                viewpoint_cam.to_device()
+                #viewpoint_cam.to_device()
             except StopIteration:
                 print("reset dataloader")
                 loader = iter(viewpoint_stack_loader)
@@ -173,7 +173,7 @@ def train(dataset, opt, pipe, saving_iterations, debug_from, densify=0, duration
             
             render_pkg = render(viewpoint_cam, gaussians, pipe, background,  override_color=None,  basicfunction=rbfbasefunction, GRsetting=GRsetting, GRzer=GRzer)
             image, viewspace_point_tensor, visibility_filter, radii = getrenderparts(render_pkg) 
-            gt_image = viewpoint_cam.original_image.float()#.cuda()
+            gt_image = viewpoint_cam.original_image.float().cuda()
             
             if opt.reg == 2:
                 Ll1 = l2_loss(image, gt_image)
