@@ -76,28 +76,26 @@ class COLMAP_Dataset(Dataset):#follow scene.neural_3D-dataset_NDC.Neural3D_NDC_D
             self.near = bounds.min() * 0.95
             self.far = bounds.max() * 1.05
             
+            poses = poses_bounds[:,:15].reshape(-1,3,5)
+            poses = np.concatenate([poses[:,:,1:2],poses[:,:,0:1],-poses[:,:,2:3],poses[:,:,3:4],poses[:,:,4:5]],2)
+            hwfs = poses[:,:,4:].squeeze()
+            poses = poses[:,:,:4]
+            c2w_mats = np.concatenate([poses,np.tile(np.array([[[0,0,0,1.]]]),[poses.shape[0],1,1])],1)
+            w2c_mats = np.linalg.inv(c2w_mats)
+            Rotations = w2c_mats[:,:3,:3].transpose([0,2,1])
+            Translations = w2c_mats[:,:3,3]
 
         self.images_paths = []
         self.camera_params = []
-        for key in sorted(cam_extrinsics.keys()):
-            extr = cam_extrinsics[key]
-            intr = cam_intrinsics[extr.camera_id]
-            height = intr.height
-            width = intr.width
-            uid = intr.id
-            Rotation = np.transpose(qvec2rotmat(extr.qvec))
-            Translation = np.array(extr.tvec)
-            if intr.model=="SIMPLE_PINHOLE":
-                focal_length_x = intr.params[0]
-                FovY = focal2fov(focal_length_x, height)
-                FovX = focal2fov(focal_length_x, width)
-            elif intr.model=="PINHOLE":
-                focal_length_x = intr.params[0]
-                focal_length_y = intr.params[1]
-                FovY = focal2fov(focal_length_y, height)
-                FovX = focal2fov(focal_length_x, width)
-            else:
-                assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
+        for i,(hwf,Rotation,Translation) in enumerate(zip(hwfs,Rotations,Translations)):
+            height,width,focal_length_x = hwf
+            height = int(height)
+            width = int(width)
+            uid = i
+
+            FovY = focal2fov(focal_length_x, height)
+            FovX = focal2fov(focal_length_x, width)
+     
             world_view_transform,full_proj_transform,camera_center,rays \
                 = self.get_rays(Rotation,Translation,FovY,FovX,width,height)
             
@@ -105,7 +103,7 @@ class COLMAP_Dataset(Dataset):#follow scene.neural_3D-dataset_NDC.Neural3D_NDC_D
                                        world_view_transform,full_proj_transform,camera_center,rays])
 
             for j in range(startime, startime+ int(duration)):
-                image_path = os.path.join(images_folder, os.path.basename(extr.name))
+                image_path = os.path.join(images_folder, f'cam{i:02}.png')
                 image_path = image_path.replace("colmap_"+str(startime), "colmap_{}".format(j), 1)
                 assert os.path.exists(image_path), "Image {} does not exist!".format(image_path)
                 self.images_paths.append(image_path)
