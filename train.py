@@ -224,7 +224,10 @@ def train(dataset, opt, pipe, saving_iterations, debug_from, densify=0, duration
             # Progress bar
             ema_loss_for_log = 0.4 * loss.item() + 0.6 * ema_loss_for_log
             if iteration % 10 == 0:
-                progress_bar.set_postfix({"Loss": f"{ema_loss_for_log:.{7}f}, Num Gaussian: {gaussians._xyz.shape[0]}"})
+                progress_bar.set_postfix({"Loss": f"{ema_loss_for_log:.{7}f}", 
+                                          "Num Gaussian": f"{gaussians._xyz.shape[0]}",
+                                          #"xyz": f"{gaussians._xyz.min()} {gaussians._xyz.max()}",
+                                          })
                 progress_bar.update(10)
             if iteration == opt.iterations:
                 progress_bar.close()

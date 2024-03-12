@@ -24,7 +24,7 @@ from utils.general_utils import PILtoTorch
 class Camera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,
                  image_name, uid, data_device = "cuda", timestamp=0.0,
-                 world_view_transform=None,full_proj_transform=None,camera_center=None,rays=None
+                 projection_matrix=None,world_view_transform=None,full_proj_transform=None,camera_center=None,rays=None
                  ):
         super(Camera, self).__init__()
 
@@ -59,6 +59,7 @@ class Camera(nn.Module):
             self.image_width = image[0]
             self.image_height = image[1]
             self.original_image = None
+        self.projection_matrix = projection_matrix
         self.world_view_transform = world_view_transform
         self.full_proj_transform = full_proj_transform
         self.camera_center = camera_center

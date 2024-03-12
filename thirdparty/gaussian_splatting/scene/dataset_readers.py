@@ -806,9 +806,24 @@ def readColmapSceneInfo(path, images, eval, llffhold=8, multiview=False, duratio
         totalxyz = []
         totalrgb = []
         totaltime = []
+        #xyz_min = None
+        #xyz_max = None
+        #num_pts = None
         for i in range(starttime, starttime + duration):
-            thisbin_path = os.path.join(path, "sparse/0/points3D.bin").replace("colmap_"+ str(starttime), "colmap_" + str(i), 1)
-            xyz, rgb, _ = read_points3D_binary(thisbin_path)
+            if True:#i == 0:
+                thisbin_path = os.path.join(path, "sparse/0/points3D.bin").replace("colmap_"+ str(starttime), "colmap_" + str(i), 1)
+                xyz, rgb, _ = read_points3D_binary(thisbin_path)
+                #xyz_min = xyz.min(axis=0)  
+                #xyz_max = xyz.max(axis=0)  
+                #num_pts = 1000#xyz.shape[0]
+                #print(xyz[0:10])
+                #print(rgb[0:10])
+            # else:
+            #     xyz = (np.random.random((num_pts, 3)))* (xyz_max-xyz_min) + xyz_min
+            #     rgb = np.random.randint(256,size=(num_pts, 3)).astype(np.float32)
+            #     #print(xyz[0:10])
+            #     #print(rgb[0:10])
+            #     #exit(0)
             totalxyz.append(xyz)
             totalrgb.append(rgb)
             totaltime.append(np.ones((xyz.shape[0], 1)) * (i-starttime) / duration)
